@@ -29,7 +29,7 @@ REPORTSERVER_URL=https://github.com/mvilche/reportserver.git
 WORKDIR /opt/tomcat/webapps
 
 RUN git clone $REPORTSERVER_URL ROOT && \
-git checkout tags/$REPORTSERVER_VERSION && \
+cd ROOT && git checkout tags/$REPORTSERVER_VERSION && \
 touch /etc/localtime /etc/timezone && \
 chown -R $USER /opt /usr/libexec/s2i /etc/localtime /etc/timezone  && \
 chgrp -R $GROUP /opt /usr/libexec/s2i /etc/localtime /etc/timezone  && \
