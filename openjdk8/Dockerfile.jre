@@ -1,0 +1,44 @@
+FROM alpine:3.11
+
+ENV JDK_VERSION=openjdk8 \
+TOMCAT_VERSION=https://downloads.apache.org/tomcat/tomcat-8/v8.5.53/bin/apache-tomcat-8.5.53.tar.gz
+
+LABEL autor="Martin Vilche <mfvilche@gmail.com>" \
+      io.k8s.description="Runtime image jdk alpine" \
+      io.k8s.display-name="Java Applications" \
+      io.openshift.tags="builder,java,maven,runtime" \
+      io.openshift.expose-services="8080,8009,8778,8443" \
+      io.openshift.s2i.scripts-url="image:///usr/libexec/s2i" \
+      org.jboss.deployments-dir="/opt/tomcat/webapps"
+
+RUN apk add --update --no-cache $JDK_VERSION wget findutils bash tzdata msttcorefonts-installer fontconfig && \
+    update-ms-fonts && \
+    fc-cache -f && \
+mkdir /opt/tomcat && wget $TOMCAT_VERSION --progress=bar:force -O /tmp/tomcat.tar.gz && \
+tar zxvf /tmp/tomcat.tar.gz -C /opt/tomcat --strip-components 1 && rm -rf /tmp/tomcat.tar.gz /opt/tomcat/webapps/*
+
+COPY contrib/drivers/*.jar /opt/tomcat/lib/
+COPY contrib/jolokia-jvm-1.6.2-agent.jar /usr/libexec/s2i/jolokia-jvm-1.6.2-agent.jar
+COPY s2i/bin/ /usr/libexec/s2i
+
+ENV USER=1000 \
+GROUP=1000 \
+REPORTSERVER_VERSION= 3.10 \
+REPORTSERVER_URL=https://github.com/mvilche/reportserver.git
+
+WORKDIR /opt/tomcat/webapps
+
+RUN git clone $REPORTSERVER_URL ROOT && \
+git checkout tags/$REPORTSERVER_VERSION && \
+touch /etc/localtime /etc/timezone && \
+chown -R $USER /opt /usr/libexec/s2i /etc/localtime /etc/timezone  && \
+chgrp -R $GROUP /opt /usr/libexec/s2i /etc/localtime /etc/timezone  && \
+chmod -R g=u /opt /usr/libexec/s2i /etc/localtime /etc/timezone && \
+chmod +x /opt/tomcat/bin/* /usr/libexec/s2i/*
+
+USER $USER:$GROUP
+
+EXPOSE 8080 8443 8009
+
+CMD ["/usr/libexec/s2i/run"]
+

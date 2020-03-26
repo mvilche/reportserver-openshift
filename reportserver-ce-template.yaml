@@ -1,0 +1,485 @@
+    ##comienzo Template
+  apiVersion: v1
+  kind: Template
+  metadata:
+    name: reportserver-mvilche
+    labels:
+      template: reportserver-mvilche
+      autor: "Martin_Fabrizzio_Vilche"
+    annotations:
+      openshift.io/display-name: "reportserver-mvilche"
+      iconClass: "icon-wildfly"
+      description: >-
+        reportserver s2i images + openjdk + ant + jolokia
+      openshift.io/provider-display-name: "Martin Fabrizzio Vilche"
+      openshift.io/documentation-url: "https://github.com/mvilche/wildfly-s2i.git"
+      openshift.io/support-url: "https://github.com/mvilche/wildfly-s2i.git"
+  message: >-
+    Eliga la version de Wildfly y Openjdk que desea utilizar
+    La conexion a la base de datos podra ser realizada en el standalone.xml disponible en los configmaps
+
+  objects:
+
+  - apiVersion: v1
+    kind: DeploymentConfig
+    metadata:
+      labels:
+        app: "${APP_NAME}"
+      name: "${APP_NAME}"
+    spec:
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        app: ${APP_NAME}
+        deploymentconfig: ${APP_NAME}
+      strategy:
+        activeDeadlineSeconds: 21600
+        resources: {}
+        rollingParams:
+          intervalSeconds: 1
+          maxSurge: 25%
+          maxUnavailable: 25%
+          timeoutSeconds: 600
+          updatePeriodSeconds: 1
+        type: Rolling
+      template:
+        metadata:
+          labels:
+            app: ${APP_NAME}
+            deploymentconfig: ${APP_NAME}
+        spec:
+          containers:
+            - image: "${APP_NAME}:latest"
+              imagePullPolicy: Always
+              name: ${APP_NAME}
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+                - containerPort: 8778
+                  protocolo: TCP
+                  name: jolokia
+                - containerPort: 8443
+                  protocolo: TCP
+                  name: https
+                - containerPort: 8009
+                  protocolo: TCP
+                  name: ajp                                
+              livenessProbe:
+                failureThreshold: 3
+                initialDelaySeconds: 60
+                periodSeconds: 20
+                successThreshold: 1
+                httpGet:
+                  port: 8080
+                  path: /
+                timeoutSeconds: 15
+              readinessProbe:
+                failureThreshold: 3
+                initialDelaySeconds: 60
+                periodSeconds: 20
+                successThreshold: 1
+                httpGet:
+                  port: 8080
+                  path: /
+                timeoutSeconds: 15
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: 1
+                  memory: 2Gi
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/persistence.properties
+                  name: configmap-1
+                  subPath: persistence.properties
+                - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/reportserver.properties
+                  name: configmap-2
+                  subPath: reportserver.properties    
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - configMap:
+                defaultMode: 420
+                items:
+                  - key: persistence.properties
+                    path: persistence.properties
+                name: ${APP_NAME}-config
+              name: configmap-1
+            - configMap:
+                defaultMode: 420
+                items:
+                  - key: reportserver.properties
+                    path: reportserver.properties
+                name: ${APP_NAME}-config
+              name: configmap-2
+      test: false
+      triggers:
+        - type: ConfigChange
+        - imageChangeParams:
+            automatic: true
+            containerNames:
+              - ${APP_NAME}
+            from:
+              kind: ImageStreamTag
+              name: "${APP_NAME}:latest"
+          type: ImageChange
+     
+
+
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: ${APP_NAME}
+      name: ${APP_NAME}
+    spec:
+      ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+        - name: jolokia
+          port: 8778
+          protocol: TCP
+          targetPort: 8778
+        - name: ajp
+          port: 8009
+          protocol: TCP
+          targetPort: 8009
+        - name: https
+          port: 8443
+          protocol: TCP
+          targetPort: 8443        
+      selector:
+        app: ${APP_NAME}
+        deploymentconfig: ${APP_NAME}
+      sessionAffinity: None
+      type: ClusterIP
+
+
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      labels:
+        app: ${APP_NAME}
+      name: ${APP_NAME}-http
+    spec:
+      port:
+        targetPort: http
+      to:
+        kind: Service
+        name: ${APP_NAME}
+        weight: 100
+      wildcardPolicy: None
+
+
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      labels:
+        app: ${APP_NAME}
+      name: ${APP_NAME}
+    spec: {}
+
+
+######
+  - apiVersion: v1
+    kind: BuildConfig
+    metadata:
+      labels:
+        app: ${APP_NAME}
+        build: ${APP_NAME}
+      name: ${APP_NAME}
+    spec:
+      failedBuildsHistoryLimit: 5
+      nodeSelector: null
+      output:
+        to:
+          kind: ImageStreamTag
+          name: '${APP_NAME}:latest'
+      postCommit: {}
+      resources: {}
+      runPolicy: Serial
+      source:
+        contextDir: openjdk8
+        git:
+          ref: master
+          uri: 'https://github.com/mvilche/reportserver-openshift.git'
+        type: Git
+      strategy:
+        dockerStrategy:
+          dockerfilePath: Dockerfile.jre
+        type: Docker
+      successfulBuildsHistoryLimit: 5
+      triggers:
+        - type: ConfigChange
+
+
+  - apiVersion: v1
+    data:
+      reportserver.properties: |-
+        ### reportserver.properties ##################################################
+        # This file controls general reportserver parameters. 
+        #
+        # NOTE:
+        # Most of the properties formerly configured in this file where migrated 
+        # over to the etc tree of ReportServers internal filesystem. 
+        # 
+        ##############################################################################
+
+
+
+        ### crypto properties ########################################################
+          
+          # rs.crypto.pbe.salt
+          # configures the salt used in password based encryption
+          # reportserver uses password based encryption to store database password and 
+          # other sensitive information, that can not be stored as a hash value
+            rs.crypto.pbe.salt = The salt to be used for encryption. This should simply be a long string.
+            
+          # rs.crypto.pbe.passphrase
+          # the passphrase used in password based encryption
+            rs.crypto.pbe.passphrase = The Passphrase
+
+          # rs.crypto.pbe.keylength = 128
+          # the maximum keylength used with password based encryption
+            rs.crypto.pbe.keylength = 128
+
+          # rs.crypto.passwordhasher.hmac.passphrase 
+          # the passphrase used when calculating hmac
+            rs.crypto.passwordhasher.hmac.passphrase = This is the Passphrase used to compute the HMAC key for reportServer passwords.
+            
+        ### authenticator configuration ##############################################
+
+          # rs.authenticator.pams
+          # configures the pluggable modules the authenticator uses to verify requests
+          # multiple modules are separated by colon ":" characters
+          # possible values are: 
+          #   net.datenwerke.rs.authenticator.service.pam.UserPasswordPAM
+          #   net.datenwerke.rs.authenticator.service.pam.UserPasswordPAMAuthoritative
+          #   net.datenwerke.rs.authenticator.service.pam.IPRestrictionPAM
+          #   net.datenwerke.rs.authenticator.service.pam.EveryoneIsRootPAM
+          #   net.datenwerke.rs.authenticator.cr.service.pam.ChallengeResponsePAM
+          #   net.datenwerke.rs.authenticator.cr.service.pam.ChallengeResponsePAMAuthoritative
+          #   net.datenwerke.rs.authenticator.service.pam.ClientCertificateMatchEmailPAM
+          #   net.datenwerke.rs.authenticator.service.pam.ClientCertificateMatchEmailPAMAuthoritative
+            rs.authenticator.pams = net.datenwerke.rs.authenticator.service.pam.UserPasswordPAMAuthoritative
+
+          # rs.authenticator.iprestriction.addresses
+          # if the IPRestrictionPAM is active, this property controls the acceptable
+          # source addresses 
+          #
+          # rs.authenticator.iprestriction.addresses = 127.0.0.1/32:192.168.1.0/24
+
+          # rs.authenticator.pam.ClientCertificateMatchEmailPAM.debug
+          # this property enables debug output for the ClientCertificateMatchEmailPAM
+            rs.authenticator.pam.ClientCertificateMatchEmailPAM.debug = false
+        
+          # rs.authenticator.blockroot
+          # this property disables all accounts with root privileges   
+            rs.authenticator.blockroot = false
+
+
+        ### general settings #########################################################
+          
+          # rs.install.basedata = true
+          # creates basedata if database is empty
+            rs.install.basedata = true
+                    
+      persistence.properties: |-
+        #
+        # file: persistence.properties
+        # description: This file contains the database settings for ReportServer
+
+
+        # Credentials
+        hibernate.connection.username=reportserver
+        hibernate.connection.password=reportserver
+
+
+        # MySQL 
+        hibernate.dialect=net.datenwerke.rs.utils.hibernate.MySQL5Dialect
+        hibernate.connection.driver_class=com.mysql.jdbc.Driver
+        hibernate.connection.url=jdbc:mysql://mysql:3306/reportserver
+
+
+        # MariaDb 
+        # hibernate.dialect=net.datenwerke.rs.utils.hibernate.MariaDbDialect
+        # hibernate.connection.driver_class=org.mariadb.jdbc.Driver
+        # hibernate.connection.url=jdbc:mariadb://localhost:3306/reportserver
+
+
+        # PostgreSQL
+        # hibernate.dialect=net.datenwerke.rs.utils.hibernate.PostgreSQLDialect
+        # hibernate.connection.driver_class=org.postgresql.Driver
+        # hibernate.connection.url=jdbc:postgresql://localhost/reportserver
+
+
+        # Oracle
+        #
+        # Select ONE of the following dialects depending on your Oracle version
+        #
+        # 	hibernate.dialect=net.datenwerke.rs.utils.hibernate.Oracle10gDialect
+        # 	hibernate.dialect=net.datenwerke.rs.utils.hibernate.Oracle12cDialect
+        #
+        # hibernate.connection.driver_class=oracle.jdbc.driver.OracleDriver
+        # hibernate.connection.url=jdbc:oracle:thin:@localhost:1521:reportserver
+        # hibernate.default_schema=
+
+
+        # SQL Server
+        # hibernate.dialect=net.datenwerke.rs.utils.hibernate.SQLServer2008Dialect
+        # hibernate.connection.driver_class=com.microsoft.sqlserver.jdbc.SQLServerDriver
+        # hibernate.connection.url=jdbc:sqlserver://localhost;databaseName=reportserver
+
+
+        # DB2
+        # hibernate.dialect=net.datenwerke.rs.utils.hibernate.DB2Dialect
+        # hibernate.connection.driver_class=com.ibm.db2.jcc.DB2Driver
+        # hibernate.connection.url=jdbc:db2://localhost:50000/TEST
+
+
+        # Connection pool settings.
+        # Hibernate uses the C3P0 connection pool. The following properties allow to 
+        # configure C3P0 as used by Hibernate. Note that this does not have any effect 
+        # on the connection pool used by ReportServer for handling reporting.
+        #
+        # If no changes are made here, then the default settings are active
+        #
+        # hibernate.c3p0.acquire_increment=5
+        # hibernate.c3p0.idle_test_period=60
+        # hibernate.c3p0.timeout=3600
+        # hibernate.c3p0.max_size=30
+        # hibernate.c3p0.max_statements=0
+        # hibernate.c3p0.min_size=5
+    kind: ConfigMap
+    metadata:
+      name: ${APP_NAME}-config
+
+######
+### COMIENZO mysql
+  - apiVersion: v1
+    kind: DeploymentConfig
+    metadata:
+      labels:
+        app: reportserver
+      name: mysql
+    spec:
+      replicas: 1
+      selector:
+        app: reportserver
+        deploymentconfig: mysql
+      strategy:
+        activeDeadlineSeconds: 21600
+        resources: {}
+        type: Recreate
+      template:
+        metadata:
+          labels:
+            app: reportserver
+            deploymentconfig: mysql
+        spec:
+          containers:
+            - env:
+                - name: MYSQL_ROOT_PASSWORD
+                  value: reportserver
+                - name: MYSQL_USER
+                  value: reportserver
+                - name: MYSQL_PASSWORD
+                  value: reportserver                
+                - name: MYSQL_DATABASE
+                  value: reportserver
+              image: mysql:57
+              imagePullPolicy: Always
+              name: mysql
+              ports:
+                - containerPort: 3306
+                  protocol: TCP
+              readinessProbe:
+                exec:
+                  command:
+                  - /bin/sh
+                  - -i
+                  - -c
+                  - mysql -h 127.0.0.1 -u $MYSQL_USER -p$MYSQL_PASSWORD -D $MYSQL_DATABASE -e 'SELECT 1'
+                failureThreshold: 3
+                initialDelaySeconds: 60
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                limits:
+                  memory: 512Mi
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /var/lib/mysql/data
+                  name: mysql
+                  subPath: mysql
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - name: mysql
+              persistentVolumeClaim:
+                claimName: reportserver-data
+      test: false
+      triggers:
+        - type: ConfigChange
+        - imageChangeParams:
+            automatic: true
+            containerNames:
+              - mysql
+            from:
+              kind: ImageStreamTag
+              name: 'mysql:57'
+          type: ImageChange
+
+
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: reportserver
+      name: mysql
+    spec:
+      ports:
+        - name: tcp
+          port: 3306
+          protocol: TCP
+          targetPort: 3306
+      selector:
+        app: reportserver
+        deploymentconfig: mysql
+      sessionAffinity: None
+      type: ClusterIP
+
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+        name: mysql
+    spec:
+        tags:
+          - name: '57'
+            from:
+                kind: DockerImage
+                name: centos/mysql-57-centos7
+#####
+
+
+  parameters:
+    - name: APP_NAME
+      displayName: Nombre del microservicio
+      value: 'reportserver-ce'
+      required: true   
