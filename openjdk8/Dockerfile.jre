@@ -23,7 +23,7 @@ COPY s2i/bin/ /usr/libexec/s2i
 
 ENV USER=1000 \
 GROUP=1000 \
-REPORTSERVER_VERSION= 3.10 \
+REPORTSERVER_VERSION=3.1.0 \
 REPORTSERVER_URL=https://github.com/mvilche/reportserver.git
 
 WORKDIR /opt/tomcat/webapps
