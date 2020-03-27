@@ -490,7 +490,7 @@
     metadata:
       finalizers:
       - kubernetes.io/pvc-protection
-      name: moodle-data
+      name: reportserver-ce-data
     spec:
       accessModes:
       - ReadWriteOnce
