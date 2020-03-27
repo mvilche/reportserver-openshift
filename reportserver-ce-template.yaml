@@ -55,9 +55,7 @@
               ports:
                 - containerPort: 8080
                   protocol: TCP
-                - containerPort: 8778
-                  protocolo: TCP
-                  name: jolokia
+                  name: http
                 - containerPort: 8443
                   protocolo: TCP
                   name: https
@@ -95,9 +93,12 @@
                 - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/persistence.properties
                   name: configmap-1
                   subPath: persistence.properties
-                - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/reportserver-ce.properties
+                - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/reportserver.properties
                   name: configmap-2
-                  subPath: reportserver-ce.properties    
+                  subPath: reportserver.properties
+                - mountPath: /opt/tomcat/webapps/ROOT/WEB-INF/classes/logging-rs.properties
+                  name: configmap-3
+                  subPath: logging-rs.properties
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
@@ -117,6 +118,13 @@
                     path: reportserver-ce.properties
                 name: ${APP_NAME}-config
               name: configmap-2
+            - configMap:
+                defaultMode: 420
+                items:
+                  - key: logging-rs.properties
+                    path: logging-rs.properties
+                name: ${APP_NAME}-config
+              name: configmap-3
       test: false
       triggers:
         - type: ConfigChange
@@ -144,10 +152,6 @@
           port: 8080
           protocol: TCP
           targetPort: 8080
-        - name: jolokia
-          port: 8778
-          protocol: TCP
-          targetPort: 8778
         - name: ajp
           port: 8009
           protocol: TCP
@@ -291,8 +295,10 @@
           
           # rs.install.basedata = true
           # creates basedata if database is empty
-            rs.install.basedata = true
-                    
+            rs.install.basedata = true        
+      logging-rs.properties: |-
+        .level = SEVERE
+        net.datenwerke.level = INFO                      
       persistence.properties: |-
         #
         # file: persistence.properties
