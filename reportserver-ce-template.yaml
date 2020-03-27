@@ -300,8 +300,8 @@
 
 
         # Credentials
-        hibernate.connection.username=reportserver-ce
-        hibernate.connection.password=reportserver-ce
+        hibernate.connection.username=reportserver_ce
+        hibernate.connection.password=reportserver_ce
 
 
         # MySQL 
@@ -389,13 +389,13 @@
           containers:
             - env:
                 - name: MYSQL_ROOT_PASSWORD
-                  value: reportserver-ce
+                  value: reportserver_ce
                 - name: MYSQL_USER
-                  value: reportserver-ce
+                  value: reportserver_ce
                 - name: MYSQL_PASSWORD
-                  value: reportserver-ce                
+                  value: reportserver_ce                
                 - name: MYSQL_DATABASE
-                  value: reportserver-ce
+                  value: reportserver_ce
               image: mysql:57
               imagePullPolicy: Always
               name: mysql
@@ -475,6 +475,23 @@
             from:
                 kind: DockerImage
                 name: centos/mysql-57-centos7
+
+
+
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      finalizers:
+      - kubernetes.io/pvc-protection
+      name: moodle-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+          
 #####
 
 
