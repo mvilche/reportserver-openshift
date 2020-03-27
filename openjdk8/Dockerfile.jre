@@ -18,11 +18,10 @@ mkdir /opt/tomcat && wget $TOMCAT_VERSION --progress=bar:force -O /tmp/tomcat.ta
 tar zxvf /tmp/tomcat.tar.gz -C /opt/tomcat --strip-components 1 && rm -rf /tmp/tomcat.tar.gz /opt/tomcat/webapps/*
 
 COPY contrib/drivers/*.jar /opt/tomcat/lib/
-COPY contrib/jolokia-jvm-1.6.2-agent.jar /usr/libexec/s2i/jolokia-jvm-1.6.2-agent.jar
 COPY s2i/bin/ /usr/libexec/s2i
 
-ENV USER=1000 \
-GROUP=1000 \
+ENV USER=1001 \
+GROUP=0 \
 REPORTSERVER_VERSION=3.1.0 \
 REPORTSERVER_URL=https://github.com/mvilche/reportserver.git
 
@@ -36,7 +35,7 @@ chgrp -R $GROUP /opt /usr/libexec/s2i /etc/localtime /etc/timezone  && \
 chmod -R g=u /opt /usr/libexec/s2i /etc/localtime /etc/timezone && \
 chmod +x /opt/tomcat/bin/* /usr/libexec/s2i/*
 
-USER $USER:$GROUP
+USER 1001:0
 
 EXPOSE 8080 8443 8009
 
